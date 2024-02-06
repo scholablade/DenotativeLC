@@ -1,4 +1,5 @@
 #+title: Design and Implementation of the Ari Programming Language
+
 * Getting Started
 * Licenses
 * Motivation / Goals
@@ -29,7 +30,7 @@ Similar as in the types heading we can also use Haskell's variable semantics the
 **** Abstractions
 Abstractions correspond to function definitions, which we can think of as a function that takes an indentifier and an expression:
 #+begin_src haskell
-abstraction :: wrap (a, h) b -> wrap env (a -> b)
+abstraction :: wrap (env, a) b -> wrap env (a -> b)
 #+end_src
 **** Application
 Application is just function application and can be specified as:
@@ -66,8 +67,7 @@ The full API:
 #+begin_src haskell
 wrap env a
 application :: wrap env (a -> b) -> wrap env a -> wrap env b
-abstraction :: wrap (a, h) b -> wrap env (a -> b)
-const :: wrap (a, h) a
+abstraction :: wrap (env, a) b -> wrap env (a -> b)
 pair :: wrap env a -> wrap env b -> wrap env (a, b)
 fst :: wrap env (a, b) -> wrap env a
 snd :: wrap env (a, b) -> wrap env b
@@ -155,6 +155,7 @@ Fst is exl.
 ⟦fst e1⟧ = exl ⟦e1⟧  
 #+end_src
 **** Snd
+
 Snd is exr
 #+begin_src haskell
 ⟦snd e1⟧ = exr ⟦e1⟧  
@@ -180,11 +181,11 @@ This shows the complete denotation, I think it shows the beauty and elegance of 
 * Implementation
 ** Infrastructure
 *** Muli-line
-#+begin_src haskell
+This options allows literate programming with Haskell to be much better where it allows to make multi-line functions, (org-babel connects to ghci).
+#+NAME: multi-line
+#+begin_src haskell :results silent
 :set +m
 #+end_src
-
-#+RESULTS:
 
 ** Essential State
 *** Types
@@ -195,11 +196,12 @@ In the out of the tar pit paper, the authors suggest only using relations and mo
 As I said before, record types in Haskell can be analogous to relations (tables in SQL), infact, this approach is used in Persistent which is the most popular ORM in Haskell and the native Haskell database Project-M36 (check this project out, it's really underrated).
 The main relation is the ~R~ relation which has one pair, ~unR~ is the attribute's name and it's type is the function type.
 Let's define it:
-#+begin_src haskell
+#+NAME: reader
+#+begin_src haskell :results silent
 data R h a = R {unR :: h -> a}
 #+end_src
 
-#+RESULTS:
+
 
 The ~R~ relation is actually isomorphic to the function type since they are representially the same.
 ** Essential Logic
@@ -207,97 +209,50 @@ The ~R~ relation is actually isomorphic to the function type since they are repr
 **** Classes
 Expr is the AST of the Ari language, as I have have said before, Ari uses tagless-final so functions instead of an ADT to descibe an AST. 
 
-#+begin_src haskell
+#+begin_src haskell :results silent
 class AST wrap where
   abstraction :: wrap (h, a) b -> wrap h (a -> b)
   application :: wrap env (a -> b) -> wrap env a -> wrap env b
   pair :: wrap env a -> wrap env b -> wrap env (a, b)
+  fst' :: wrap env (a, b) -> wrap env a
+  snd' :: wrap env (a, b) -> wrap env b
+  unit :: wrap env ()  
 
 -- Necessary comment for the where clause to be closed, ob-haskell should be improved :)
 #+end_src
-
-#+RESULTS:
-
-
 **** Instance
-
 Since we are doing the AST, the tagless-final way, the design and implementation are actually not that different which I find to be so beautiful.
 ***** Helper functions
 Helper functions that will make the code cleaner.
-#+begin_src haskell
+#+begin_src haskell :results silent
 apply (f, x) = f x
 triangle f g = \x -> (f x, g x)
 fe1 e1 = \x -> (unR e1 x)
 fe2 e2 = \x -> (unR e2 x)
-
+it' h = ()
+  
 #+end_src
 
+***** Back to reader instance
 #+begin_src haskell
+
 instance AST R where
   abstraction e1 = R $ curry (unR e1)
-  application e1 e2 = R $ apply . (triangle fe1 fe2)
-  pair e1 e2 = R $ triangle fe1 fe2
-    where
-      apply (f, x) = f x
-      triangle f g = \x -> (f x, g x)
-      fe1 = \x -> (unR e1 x)
-      fe2 = \x -> (unR e2 x)
+  application e1 e2 = R $ apply . (triangle (fe1 e1) (fe2 e2))
+  pair e1 e2 = R $ triangle (fe1 e1) (fe2 e2)
+  fst' e1 = R $ \h -> fst $ (unR e1 h)
+  snd' e1 = R $ \h -> snd $ (unR e1 h)
+  unit = R $ it'
+  
 
-
+  
 -- T
 #+end_src
 
 #+RESULTS:
-#+begin_example
-ghci| ghci| ghci| ghci| ghci| ghci| ghci| ghci| ghci| 
-<interactive>:451:45-47: error:
-    • Couldn't match type ‘env’ with ‘R (h0 -> b) b’
-      Expected: env -> (h0 -> b) -> b
-        Actual: R (h0 -> b) b -> (h0 -> b) -> b
-      ‘env’ is a rigid type variable bound by
-        the type signature for:
-          application :: forall env a b. R env (a -> b) -> R env a -> R env b
-        at <interactive>:451:3-13
-    • In the first argument of ‘triangle’, namely ‘fe1’
-      In the second argument of ‘(.)’, namely ‘(triangle fe1 fe2)’
-      In the second argument of ‘($)’, namely
-        ‘apply . (triangle fe1 fe2)’
-    • Relevant bindings include
-        e2 :: R env a (bound at <interactive>:451:18)
-        e1 :: R env (a -> b) (bound at <interactive>:451:15)
-        application :: R env (a -> b) -> R env a -> R env b
-          (bound at <interactive>:451:3)
-#+end_example
-
-# ** Applicationa
-on
-Let's start with application, application takes two terms, the first one a function and the second term you apply it to create a third term.
-In tagless-final paper it's:
-
-#+begin_src haskell
-apply = 
-type Function = (->)
-instance Expr Function where
-  application a b = apply  (\h -> triangle (a h) (b h))
-  -- a
-#+end_src
-
-
-
-#+begin_src haskell
-instance AST R where
-  abstraction e1 e2 = apply
-#+end_src
-
 
 ** Accidental State And Control
 ** Other (Interfacing)
 
 * Footnotes
 [fn:1]:
-* For Stream
-Added in Design, functionality.
-Fixed types heading.
-Done expressions off-stream.
-Work on the denotation heading.
-Some prose added.
