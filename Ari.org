@@ -56,6 +56,11 @@ Snd is identical to Fst except it grabs the second value.
 #+begin_src haskell
 snd :: wrap env (a, b) -> wrap env b
 #+end_src
+**** Unit
+Unit is the terminal object of the CCC, we can describe the function as:
+#+begin_src haskell
+unit :: wrap env ()
+#+end_src
 *** The full picture
 The full API:
 #+begin_src haskell
@@ -66,6 +71,7 @@ const :: wrap (a, h) a
 pair :: wrap env a -> wrap env b -> wrap env (a, b)
 fst :: wrap env (a, b) -> wrap env a
 snd :: wrap env (a, b) -> wrap env b
+unit :: wrap env ()  
 #+end_src
 ** Denotation
 
@@ -153,6 +159,12 @@ Snd is exr
 #+begin_src haskell
 ⟦snd e1⟧ = exr ⟦e1⟧  
 #+end_src
+**** Unit
+The ~unit~ function corresponds to the ~it~ function earlier.
+#+begin_src haskell
+⟦unit e1⟧ = it ⟦e1⟧
+#+end_src
+
 *** The full picture
 This shows the complete denotation, I think it shows the beauty and elegance of denotational design, combined with literate programming, I hope you enjoyed reading it as much as I have written it.
 #+begin_src haskell
