@@ -1,11 +1,14 @@
 #+title: Design and Implementation of the Ari Programming Language
 
+
 * Table of contents
 :PROPERTIES:
 :TOC:      :include all :depth 6 :ignore (this)
 :CONTENTS:
 - [[#getting-started][Getting Started]]
+  - [[#add-code-example][Add Code example]]
 - [[#licenses][Licenses]]
+  - [[#add-license-for-the-code-and-prose][Add license for the code and prose]]
 - [[#motivation--goals][Motivation / Goals]]
   - [[#writing-in-denotative-relational-literate-programming][Writing in Denotative Relational Literate Programming]]
   - [[#a-malleable-programming-language][A Malleable Programming Language]]
@@ -42,12 +45,6 @@
         - [[#-operator][△ operator]]
         - [[#apply][apply]]
         - [[#back-to-application][Back to application]]
-      - [[#constructors][Constructors]]
-        - [[#it][It]]
-        - [[#][(.)]]
-        - [[#unitarrow][unitArrow]]
-        - [[#flip][flip]]
-        - [[#back-to-constructors][Back to constructors]]
       - [[#pair][Pair]]
       - [[#fst][Fst]]
       - [[#snd][Snd]]
@@ -71,6 +68,7 @@
   - [[#other-interfacing][Other (Interfacing)]]
 - [[#footnotes][Footnotes]]
 :END:
+
 
 * Getting Started
 ** TODO Add Code example
@@ -225,30 +223,6 @@ We have what we need to make denotation.
 #+begin_src haskell
 ⟦application a b⟧ = apply . ⟦a⟧ △ ⟦b⟧
 #+end_src
-**** Constructors
-In Compiling With Categories, Conal shows that constructors is equivalent to the defined const function which has three parts:
-***** It
-~it~ is described in the function category where it's a morphism from any object to the terminal object where:
-#+begin_src haskell
-it :: \a -> ()
-#+end_src
-***** (.)
-Simple composition.
-***** unitArrow
-In unitArrow, you reverse the type signature of ~it~ to be:
-#+begin_src haskell
-unitArrow :: \() -> a
-#+end_src
-***** flip
-~flip~ is the function that flips two arguments in a binary operation.
-***** Back to constructors
-Now that we have all the primitives necessary we can build the constructor denotation to be just:
-
-#+begin_src haskell
-⟦constructor⟧ :: Lambda (wrap p b) => wrap p b -> Function p b
-⟦constructor p b⟧  = ⟦flip⟧ (const ⟦b⟧)
-#+end_src
-
 **** Pair
 The ~△~ corresponds perfectly as the introduction form to the pair.
 #+begin_src haskell
@@ -274,14 +248,13 @@ The ~unit~ function corresponds to the ~it~ function earlier.
 #+end_src
 
 *** The full picture
-This shows the complete denotation, I think it shows the beauty and elegance of denotational design, combined with literate programming, I hope you enjoyed reading it as much as I have written it.
+This shows the complete denotation, I think it shows the beauty and elegance of denotational design, combined with literate programming.
 #+begin_src haskell
 ⟦_⟧ :: Lambda (wrap a b) => wrap a b -> (a -> b)
 ⟦variables0⟧ = exr
 ⟦abstraction e1⟧ = curry ⟦e1⟧
 ⟦variablesSucc e1⟧ = ⟦e1⟧ . exl   
 ⟦application a b⟧ = apply . ⟦a⟧ △ ⟦b⟧
-⟦constructor b⟧  = ⟦flip⟧ (const ⟦b⟧)
 ⟦pair e1 e2⟧ = ⟦e1⟧ △ ⟦e2⟧
 ⟦fst e1⟧ = exl ⟦e1⟧
 ⟦snd e1⟧ = exr ⟦e1⟧  
