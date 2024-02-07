@@ -1,5 +1,78 @@
 #+title: Design and Implementation of the Ari Programming Language
 
+* Table of contents
+:PROPERTIES:
+:TOC:      :include all :depth 6
+:CONTENTS:
+- [[#table-of-contents][Table of contents]]
+- [[#getting-started][Getting Started]]
+- [[#licenses][Licenses]]
+- [[#motivation--goals][Motivation / Goals]]
+  - [[#writing-in-denotional-relational-literate-programming][Writing in Denotional Relational Literate Programming]]
+  - [[#a-malleable-programming-language][A Malleable Programming Language]]
+- [[#design][Design]]
+  - [[#functionality][Functionality]]
+    - [[#for-types][For types:]]
+    - [[#for-expressions][For Expressions:]]
+  - [[#specification][Specification]]
+    - [[#types][Types]]
+    - [[#expressions][Expressions]]
+      - [[#variables][Variables]]
+      - [[#abstractions][Abstractions]]
+      - [[#application][Application]]
+      - [[#constructors][Constructors]]
+      - [[#pair][Pair]]
+      - [[#fst][Fst]]
+      - [[#snd][Snd]]
+      - [[#unit][Unit]]
+    - [[#the-full-picture][The full picture]]
+  - [[#denotation][Denotation]]
+    - [[#types][Types]]
+      - [[#the-semantic-domain-the-function-category][The Semantic Domain: The Function Category]]
+    - [[#expressions][Expressions]]
+      - [[#variables][Variables]]
+        - [[#exr][exr]]
+        - [[#exl][exl]]
+        - [[#typing-context][Typing context]]
+        - [[#][(.)]]
+        - [[#back-to-variables][Back to variables]]
+      - [[#abstractions][Abstractions]]
+        - [[#curry][Curry]]
+        - [[#back-to-the-abstraction-function][Back to the abstraction function]]
+      - [[#applications][Applications]]
+        - [[#-operator][△ operator]]
+        - [[#apply][apply]]
+        - [[#back-to-application][Back to application]]
+      - [[#constructors][Constructors]]
+        - [[#it][It]]
+        - [[#][(.)]]
+        - [[#unitarrow][unitArrow]]
+        - [[#flip][flip]]
+        - [[#back-to-constructors][Back to constructors]]
+      - [[#pair][Pair]]
+      - [[#fst][Fst]]
+      - [[#snd][Snd]]
+      - [[#unit][Unit]]
+    - [[#the-full-picture][The full picture]]
+- [[#implementation][Implementation]]
+  - [[#infrastructure][Infrastructure]]
+    - [[#muli-line][Muli-line]]
+    - [[#compilation-target][Compilation target]]
+      - [[#compile-it][Compile it]]
+  - [[#essential-state][Essential State]]
+    - [[#types][Types]]
+    - [[#relations][Relations]]
+  - [[#essential-logic][Essential Logic]]
+    - [[#ast][AST]]
+      - [[#classes][Classes]]
+      - [[#instance][Instance]]
+        - [[#helper-functions][Helper functions]]
+        - [[#back-to-reader-instance][Back to reader instance]]
+  - [[#accidental-state-and-control][Accidental State And Control]]
+  - [[#other-interfacing][Other (Interfacing)]]
+- [[#footnotes][Footnotes]]
+:END:
+
 * Getting Started
 * Licenses
 * Motivation / Goals
@@ -219,6 +292,9 @@ This options allows literate programming with Haskell to be much better where it
 #+begin_src haskell :results silent
 :set +m
 #+end_src
+*** Compilation target
+~C-c~ this code block to compile the full program.
+**** TODO Compile it
 
 ** Essential State
 *** Types
