@@ -27,6 +27,14 @@ Since we use a subset of Haskell's type system we don't have to do much if at al
 *** Expressions
 **** Variables
 Similar as in the types heading we can also use Haskell's variable semantics therefore we don't have to specify variables in our language.
+Variables are de bruijn indices, we can specify them as:
+#+begin_src haskell
+variable0 :: wrap (h, a) a
+#+end_src
+And since we use de bruijn we have to specify the inductive case as:
+#+begin_src haskell
+variableSucc :: wrap h a -> wrap (h, any) a
+#+end_src
 **** Abstractions
 Abstractions correspond to function definitions, which we can think of as a function that takes an indentifier and an expression:
 #+begin_src haskell
@@ -66,6 +74,8 @@ unit :: wrap env ()
 The full API:
 #+begin_src haskell
 wrap env a
+variable0 :: wrap (h, a) a
+variableSucc :: wrap h a -> wrap (h, any) a
 application :: wrap env (a -> b) -> wrap env a -> wrap env b
 abstraction :: wrap (env, a) b -> wrap env (a -> b)
 pair :: wrap env a -> wrap env b -> wrap env (a, b)
@@ -86,12 +96,36 @@ type Function = (->)
 ⟦_⟧ :: Lambda (wrap a b) => wrap a b -> (a -> b)
 #+end_src
 *** Expressions
+**** Variables
+***** exr
+In compiling to categories exr, correspond to the ~snd~ function in a pair, it's in the cartesian part of the CCC, it's defined as:
+#+begin_src haskell
+exr (a, b) = b
+#+end_src
+***** exl
+~exl~ corresponds to fst and it's defined as:
+#+begin_src haskell
+exl (a, b) = a
+#+end_src
+***** Typing context
+Typing context is a tuple that contains the term and it's type, it looks like this: ~ℾ~.
+***** (.)
+Simple composition.
+The composition primitive is necessary for a category to be a category so we can use this primitive.
+***** Back to variables
+Generally variabels correspond to identity, ~id~ but since we have the typing environment, it infact corresponds to ~exr~.
+#+begin_src haskell
+⟦variables0⟧ = exr
+#+end_src
+We also have to inductive case to worry about, which can be defined beautifully as:
+#+begin_src haskell
+⟦variablesSucc e1⟧ = ⟦e1⟧ . exl 
+#+end_src
+
 **** Abstractions
 ***** Curry
 Curry is a higher-order function that takes in a function: ~(a, b) -> c~ and curries it to be: ~a -> b -> c~.
 It's notion in the CCC is the closed part focusing on the expontential type (the function type).
-***** Typing context
-Typing context is a tuple that contains the term and it's type, it looks like this: ~ℾ~.
 ***** Back to the abstraction function
 Abstraction in the tagless-final paper is just curry but it's type arguments ~a~ and ~b~ are flipped, I prefer to use the curry semantics, rather than add new functions, so we must consider that the typing context is unsual where the type identifer is the first and the added argument is the second.
 exl extracts the first element of the tuple and we use the second argument of abstraction to apply the function therefore we gat a function ~a -> b~.
@@ -106,9 +140,7 @@ The ~△~ operator takes in two terms and constructs a function that is a tuple 
 f ~△ g = \x -> (f x, g x)
 #+end_src
 It's notion is in cartesian part of CCC and it's the introduction form, cartesian adds products to the category.
-***** (.)
-Simple composition.
-The composition primitive is necessary for a category to be a category so we can use this primitive.
+
 ***** apply
 ~apply~ is a function that takes in a tuple and apply's the first term to the
 second.
@@ -170,14 +202,15 @@ The ~unit~ function corresponds to the ~it~ function earlier.
 This shows the complete denotation, I think it shows the beauty and elegance of denotational design, combined with literate programming, I hope you enjoyed reading it as much as I have written it.
 #+begin_src haskell
 ⟦_⟧ :: Lambda (wrap a b) => wrap a b -> (a -> b)
+⟦variables0⟧ = exr
 ⟦abstraction e1⟧ = curry ⟦e1⟧
+⟦variablesSucc e1⟧ = ⟦e1⟧ . exl   
 ⟦application a b⟧ = apply . ⟦a⟧ △ ⟦b⟧
 ⟦constructor b⟧  = ⟦flip⟧ (const ⟦b⟧)
 ⟦pair e1 e2⟧ = ⟦e1⟧ △ ⟦e2⟧
 ⟦fst e1⟧ = exl ⟦e1⟧
 ⟦snd e1⟧ = exr ⟦e1⟧  
 #+end_src
-
 * Implementation
 ** Infrastructure
 *** Muli-line
@@ -200,9 +233,6 @@ Let's define it:
 #+begin_src haskell :results silent
 data R h a = R {unR :: h -> a}
 #+end_src
-
-
-
 The ~R~ relation is actually isomorphic to the function type since they are representially the same.
 ** Essential Logic
 *** AST
@@ -211,17 +241,18 @@ Expr is the AST of the Ari language, as I have have said before, Ari uses tagles
 
 #+begin_src haskell :results silent
 class AST wrap where
+  variable0 :: wrap (h, a) a
+  variableSucc :: wrap h a -> wrap (h, any) a
   abstraction :: wrap (h, a) b -> wrap h (a -> b)
-  application :: wrap env (a -> b) -> wrap env a -> wrap env b
-  pair :: wrap env a -> wrap env b -> wrap env (a, b)
-  fst' :: wrap env (a, b) -> wrap env a
-  snd' :: wrap env (a, b) -> wrap env b
-  unit :: wrap env ()  
+  application :: wrap h (a -> b) -> wrap h a -> wrap h b
+  pair :: wrap h a -> wrap h b -> wrap h (a, b)
+  fst' :: wrap h (a, b) -> wrap h a
+  snd' :: wrap h (a, b) -> wrap h b
+  unit :: wrap h ()
 
 -- Necessary comment for the where clause to be closed, ob-haskell should be improved :)
 #+end_src
 **** Instance
-Since we are doing the AST, the tagless-final way, the design and implementation are actually not that different which I find to be so beautiful.
 ***** Helper functions
 Helper functions that will make the code cleaner.
 #+begin_src haskell :results silent
@@ -234,18 +265,17 @@ it' h = ()
 #+end_src
 
 ***** Back to reader instance
+Since we are doing the AST, the tagless-final way, the design and implementation are actually not that different which I find to be so beautiful.
 #+begin_src haskell
-
 instance AST R where
+  variable0 = R $ snd
+  variableSucc v = R $ unR v . fst
   abstraction e1 = R $ curry (unR e1)
   application e1 e2 = R $ apply . (triangle (fe1 e1) (fe2 e2))
   pair e1 e2 = R $ triangle (fe1 e1) (fe2 e2)
   fst' e1 = R $ \h -> fst $ (unR e1 h)
   snd' e1 = R $ \h -> snd $ (unR e1 h)
   unit = R $ it'
-  
-
-  
 -- T
 #+end_src
 
@@ -253,6 +283,5 @@ instance AST R where
 
 ** Accidental State And Control
 ** Other (Interfacing)
-
 * Footnotes
 [fn:1]:
