@@ -2,13 +2,12 @@
 
 * Table of contents
 :PROPERTIES:
-:TOC:      :include all :depth 6
+:TOC:      :include all :depth 6 :ignore (this)
 :CONTENTS:
-- [[#table-of-contents][Table of contents]]
 - [[#getting-started][Getting Started]]
 - [[#licenses][Licenses]]
 - [[#motivation--goals][Motivation / Goals]]
-  - [[#writing-in-denotional-relational-literate-programming][Writing in Denotional Relational Literate Programming]]
+  - [[#writing-in-denotative-relational-literate-programming][Writing in Denotative Relational Literate Programming]]
   - [[#a-malleable-programming-language][A Malleable Programming Language]]
 - [[#design][Design]]
   - [[#functionality][Functionality]]
@@ -74,9 +73,12 @@
 :END:
 
 * Getting Started
+** TODO Add Code example
+
 * Licenses
+** TODO Add license for the code and prose
 * Motivation / Goals
-** Writing in Denotional Relational Literate Programming
+** Writing in Denotative Relational Literate Programming
 ** A Malleable Programming Language
 * Design
 ** Functionality
