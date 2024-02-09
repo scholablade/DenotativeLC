@@ -203,11 +203,13 @@ parseSnd :: Lambda wrap h a => Parsec wrap h a
 parseUnit :: Lambda wrap h a => Parsec wrap h a
 parseAri :: Lambda wrap h a => Parsec wrap h a  
 #+end_src
+
+
 ** Denotation
 We are going to make semantic functions that map the lambda calculus world to /a/ closed cartesian category, first we have to define the semantic domain though. 
 Regardless, we will only make a denotation for the typeclass (let's call it Lambda), Abstractions, Applications and Constructors since we are only introducing those primitives while everything else is for free for us by HOAS.
 *** AST
-*** Types
+**** Types
 ***** The Semantic Domain: The Function Category
 You can pick any closed cartesian category really but the function category is simple, an instance comes with the library itself and the lambda calculus is generally a theory of computation of functions so it works out.
 So let's model it.
@@ -292,15 +294,15 @@ The ~unit~ function corresponds to the ~it~ function earlier.
 #+begin_src haskell
 ⟦unit e1⟧ = it ⟦e1⟧
 #+end_src
-
-**** Parsing
-***** Parsing type
+*** Parsing
+**** Parsing types
+***** Parser type
 While the parser type is slighty complicated being ~Parsec (wrap h a)~, we can think of it as ~String -> (wrap h a)~, ~String~ is ~[Char]~, we can also say the denotation of ~Char~ is a disjoint union, (a sum type) and /a/ denotation of a list is a sequence and since we have the denotation of ~wrap h a~ we can therefore write the semantic function as:
 While the notation of sequence is ~()~, since parantheses are used a lot in Haskell we will instead use: ~⟨⟩~.
 #+begin_src haskell
 ⟦_⟧ :: Lambda (wrap h a) => Parsec (wrap h a) -> (⟨Char⟩ -> (h -> a))
 #+end_src
-***** Parsing combinators
+Other than this type, there will be no more denotations since that goes into the implementation details of the library (MegaParsec) which currently has no denotional semantics described for us to use.
 
 *** The full picture
 This shows the complete denotation, I think it shows the beauty and elegance of denotational design, combined with literate programming.
@@ -312,10 +314,34 @@ This shows the complete denotation, I think it shows the beauty and elegance of 
 ⟦application a b⟧ = apply . ⟦a⟧ △ ⟦b⟧
 ⟦pair e1 e2⟧ = ⟦e1⟧ △ ⟦e2⟧
 ⟦fst e1⟧ = exl ⟦e1⟧
-⟦snd e1⟧ = exr ⟦e1⟧  
+⟦snd e1⟧ = exr ⟦e1⟧
+
+-- Parsing
+⟦_⟧ :: Lambda (wrap h a) => Parsec (wrap h a) -> (⟨Char⟩ -> (h -> a))
 #+end_src
 * Implementation
 ** Infrastructure
+*** Add libraries
+Run bash to install MegaParsec
+#+begin_src bash
+cabal install --lib megaparsec
+#+end_src
+*** Language extensions
+Language extensions here.
+#+begin_src haskell :results silent
+:set -XPartialTypeSignatures
+:set -XScopedTypeVariables
+:set -XOverloadedStrings
+#+end_src
+
+*** Imports
+In this heading we have imports.
+#+begin_src haskell
+import Text.Megaparsec
+#+end_src
+
+#+RESULTS:
+
 *** Muli-line
 This options allows literate programming with Haskell to be much better where it allows to make multi-line functions, (org-babel connects to ghci).
 #+NAME: multi-line
@@ -384,13 +410,54 @@ instance AST R where
   unit = R $ it'
 -- T
 #+end_src
+
+#+RESULTS:
+
 *** Evaluator
 Evaluation is simple with just the function:
 #+begin_src haskell
 eval e = unR e ()
 #+end_src
 
-*** 
+#+RESULTS:
+
+
+*** Parser
+**** Reversed words
+Words that are not avalaible for the user.
+#+begin_src haskell
+reservedWords :: [String]
+reservedWords = ["zero", "succ", "lam", "pair", "fst", "snd", "unit"]
+#+end_src
+
+#+RESULTS:
+: <interactive>:53:1-13: error:
+:     Variable not in scope: reservedWords :: [String]
+
+**** Back to parser
+Simple parser combinations, we are not using the R type but instead we are overloading the operations
+#+begin_src haskell
+import Text.Megaparsec.Char
+import Text.Megaparsec
+import Data.Void 
+type Parser = Parsec Void String
+instance Show Parser
+  
+parseVariable0 :: Parser (R (h, a) a)
+parseVariable0 = string ("zero") *> pure variable0
+
+
+#+end_src
+
+#+RESULTS:
+: <interactive>:153:1-37: error:
+:     • No instance for (Show (Parser (R (h0, a0) a0)))
+:         arising from a use of ‘print’
+:     • In a stmt of an interactive GHCi command: print it
+
+
+
+
 ** Accidental State And Control
 ** Other (Interfacing)
 * Footnotes
