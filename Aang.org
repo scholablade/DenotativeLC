@@ -1,0 +1,464 @@
+#+title: Design and Implementation of the Ari Programming Language
+
+* Table of contents
+:PROPERTIES:
+:TOC:      :include all :depth 6 :ignore (this)
+:CONTENTS:
+- [[#getting-started][Getting Started]]
+  - [[#add-code-example][Add Code example]]
+- [[#licenses][Licenses]]
+  - [[#add-license-for-the-code-and-prose][Add license for the code and prose]]
+- [[#motivation--goals][Motivation / Goals]]
+  - [[#writing-in-denotative-relational-literate-programming][Writing in Denotative Relational Literate Programming]]
+  - [[#a-malleable-programming-language][A Malleable Programming Language]]
+- [[#design][Design]]
+  - [[#functionality][Functionality]]
+    - [[#for-types][For types:]]
+    - [[#for-expressions][For Expressions:]]
+  - [[#specification][Specification]]
+    - [[#types][Types]]
+    - [[#expressions][Expressions]]
+      - [[#variables][Variables]]
+      - [[#abstractions][Abstractions]]
+      - [[#application][Application]]
+      - [[#constructors][Constructors]]
+      - [[#pair][Pair]]
+      - [[#fst][Fst]]
+      - [[#snd][Snd]]
+      - [[#unit][Unit]]
+    - [[#the-full-picture][The full picture]]
+  - [[#denotation][Denotation]]
+    - [[#types][Types]]
+      - [[#the-semantic-domain-the-function-category][The Semantic Domain: The Function Category]]
+    - [[#expressions][Expressions]]
+      - [[#variables][Variables]]
+        - [[#exr][exr]]
+        - [[#exl][exl]]
+        - [[#typing-context][Typing context]]
+        - [[#][(.)]]
+        - [[#back-to-variables][Back to variables]]
+      - [[#abstractions][Abstractions]]
+        - [[#curry][Curry]]
+        - [[#back-to-the-abstraction-function][Back to the abstraction function]]
+      - [[#applications][Applications]]
+        - [[#-operator][△ operator]]
+        - [[#apply][apply]]
+        - [[#back-to-application][Back to application]]
+      - [[#pair][Pair]]
+      - [[#fst][Fst]]
+      - [[#snd][Snd]]
+      - [[#unit][Unit]]
+    - [[#the-full-picture][The full picture]]
+- [[#implementation][Implementation]]
+  - [[#infrastructure][Infrastructure]]
+    - [[#muli-line][Muli-line]]
+    - [[#compilation-target][Compilation target]]
+      - [[#compile-it][Compile it]]
+  - [[#essential-state][Essential State]]
+    - [[#types][Types]]
+    - [[#relations][Relations]]
+  - [[#essential-logic][Essential Logic]]
+    - [[#ast][AST]]
+      - [[#classes][Classes]]
+      - [[#instance][Instance]]
+        - [[#helper-functions][Helper functions]]
+        - [[#back-to-reader-instance][Back to reader instance]]
+  - [[#accidental-state-and-control][Accidental State And Control]]
+  - [[#other-interfacing][Other (Interfacing)]]
+- [[#footnotes][Footnotes]]
+:END:
+
+* Getting Started
+** TODO Add Code example
+
+* Licenses
+** TODO Add license for the code and prose
+* Motivation / Goals
+** Arithemtic types
+** Writing in Denotative Relational Literate Programming
+*** Denotational Design
+Denotational design is a methodology developed by Conal Elliott, to improve the state of software development, currently most software is developed without any design and a dose of (let's just do it), this leaves a bunch of problems like technical debt, leaky abstraction and much more, denotational design at it's essence is to make a mathematical model of your types and operations by /simple/ math that has been discovered for other reasons, for example we can /denotate/ a stack data structure to be a function that takes in a natural number and returns an ~a~, so ~Nat -> a~, then we will make denotate the functions that use Stack like ~empty~ for an empty stack.
+- I recommend listening to the podcasts (link podcasts)
+- (Link advent of Haskell article)
+*** Literate Programming
+*** Functional Relational Programming
+*** Combining all three
+** A Malleable Programming Language
+* Design
+** Functionality
+Ari is a simply typed lambda calculus (STLC) (for now), typically STLC has 2 base types and 4 expressions.
+We follow the paper[fn:1], which defines the following types and expressions.
+*** For types:
+- Base Type
+- Function Type
+*** For Expressions:
+- Variables
+- Abstractions
+- Applications
+- Constructors
+- Pair
+- Fst
+- Snd
+- Unit
+** Specification
+*** AST
+**** Types
+Since we use a subset of Haskell's type system we don't have to do much if at all, this approach is called higher-order abstract syntax (HOAS).
+**** Expressions
+***** Variables
+Similar as in the types heading we can also use Haskell's variable semantics therefore we don't have to specify variables in our language.
+Variables are de bruijn indices, we can specify them as:
+#+begin_src haskell
+variable0 :: wrap (h, a) a
+#+end_src
+And since we use de bruijn we have to specify the inductive case as:
+#+begin_src haskell
+variableSucc :: wrap h a -> wrap (h, any) a
+#+end_src
+***** Abstractions
+Abstractions correspond to function definitions, which we can think of as a function that takes an indentifier and an expression:
+#+begin_src haskell
+abstraction :: wrap (env, a) b -> wrap env (a -> b)
+#+end_src
+***** Application
+Application is just function application and can be specified as:
+#+begin_src haskell
+application :: wrap env (a -> b) -> wrap env a -> wrap env b
+#+end_src
+***** Constructors
+Constructors are the builders of types, therefore their specification must not consume anything:
+#+begin_src haskell
+const :: wrap (a, h) a
+#+end_src
+***** Pair
+Pair is the combination of two types, in Haskell it is the ~(,)~ type.
+#+begin_src haskell
+pair :: wrap env a -> wrap env b -> wrap env (a, b)
+#+end_src
+***** Fst
+fst is grabbing the first value of the pair type.
+#+begin_src haskell
+fst :: wrap env (a, b) -> wrap env a
+#+end_src
+***** Snd
+Snd is identical to Fst except it grabs the second value.
+#+begin_src haskell
+snd :: wrap env (a, b) -> wrap env b
+#+end_src
+***** Unit
+Unit is the terminal object of the CCC, we can describe the function as:
+#+begin_src haskell
+unit :: wrap env ()
+#+end_src
+*** Parser
+Instead of making a lexer + parser, parser combinators provides us a different approach where we merge both steps into only one.
+We will use the MegaParsec library for a parser, in this section we will specify each parser and then combine them for a complete parser.
+**** Parser Type
+The main type in MegaParsec is the ~ParsecT e s m a~, the first ~e~ is the error type, ~s~ stream type, ~m a~ is the underlying monad.
+We will abstract the underlying monad via the type synonym.
+#+begin_src haskell
+type Parsec e s = ParsecT e s Identity
+#+end_src
+And finally another abstraction over the ~e~ error and the stream type being ~String~.
+#+begin_src haskell
+type Parser = Parsec Void String
+#+end_src
+**** Parser combinators
+Specification of all the parser combinators are:
+#+begin_src haskell
+parseVariables0 :: Lambda wrap h a => Parsec wrap h a
+parseVariableSucc :: Lambda wrap h a => Parsec wrap h a
+parseApplication :: Lambda wrap h a => Parsec wrap h a
+parseAbstraction :: Lambda wrap h a => Parsec wrap h a
+parsePair :: Lambda wrap h a => Parsec wrap h a
+parseFst :: Lambda wrap h a => Parsec wrap h a
+parseSnd :: Lambda wrap h a => Parsec wrap h a
+parseUnit  :: Lambda wrap h a => Parsec wrap h a
+#+end_src
+We can combine these combinators into one parser:
+#+begin_src haskell
+parseAri :: Lambda wrap h a => Parsec wrap h a
+#+end_src
+*** The full picture
+The full API:
+#+begin_src haskell
+wrap env a
+variable0 :: wrap (h, a) a
+variableSucc :: wrap h a -> wrap (h, any) a
+application :: wrap h (a -> b) -> wrap h a -> wrap h b
+abstraction :: wrap (env, a) b -> wrap env (a -> b)
+pair :: wrap env a -> wrap env b -> wrap env (a, b)
+fst :: wrap env (a, b) -> wrap env a
+snd :: wrap env (a, b) -> wrap env b
+unit :: wrap env ()
+
+-- Parsing
+Lambda wrap h a => Parsec wrap h a
+parseVariables0 :: Lambda wrap h a => Parsec wrap h a
+parseVariableSucc :: Lambda wrap h a => Parsec wrap h a
+parseApplication :: Lambda wrap h a => Parsec wrap h a
+parseAbstraction :: Lambda wrap h a => Parsec wrap h a
+parsePair :: Lambda wrap h a => Parsec wrap h a
+parseFst :: Lambda wrap h a => Parsec wrap h a
+parseSnd :: Lambda wrap h a => Parsec wrap h a
+parseUnit :: Lambda wrap h a => Parsec wrap h a
+parseAri :: Lambda wrap h a => Parsec wrap h a  
+#+end_src
+
+
+** Denotation
+We are going to make semantic functions that map the lambda calculus world to /a/ closed cartesian category, first we have to define the semantic domain though. 
+Regardless, we will only make a denotation for the typeclass (let's call it Lambda), Abstractions, Applications and Constructors since we are only introducing those primitives while everything else is for free for us by HOAS.
+*** AST
+**** Types
+***** The Semantic Domain: The Function Category
+You can pick any closed cartesian category really but the function category is simple, an instance comes with the library itself and the lambda calculus is generally a theory of computation of functions so it works out.
+So let's model it.
+#+begin_src haskell
+⟦_⟧ :: Lambda (wrap a b) => wrap a b -> (a -> b)
+#+end_src
+**** Expressions
+***** Variables
+****** exr
+In compiling to categories exr, correspond to the ~snd~ function in a pair, it's in the cartesian part of the CCC, it's defined as:
+#+begin_src haskell
+exr (a, b) = b
+#+end_src
+****** exl
+~exl~ corresponds to fst and it's defined as:
+#+begin_src haskell
+exl (a, b) = a
+#+end_src
+****** Typing context
+Typing context is a tuple that contains the term and it's type, it looks like this: ~ℾ~.
+****** (.)
+Simple composition.
+The composition primitive is necessary for a category to be a category so we can use this primitive.
+****** Back to variables
+Generally variabels correspond to identity, ~id~ but since we have the typing environment, it infact corresponds to ~exr~.
+#+begin_src haskell
+⟦variables0⟧ = exr
+#+end_src
+We also have to inductive case to worry about, which can be defined beautifully as:
+#+begin_src haskell
+⟦variablesSucc e1⟧ = ⟦e1⟧ . exl 
+#+end_src
+
+***** Abstractions
+****** Curry
+Curry is a higher-order function that takes in a function: ~(a, b) -> c~ and curries it to be: ~a -> b -> c~.
+It's notion in the CCC is the closed part focusing on the expontential type (the function type).
+****** Back to the abstraction function
+Abstraction in the tagless-final paper is just curry but it's type arguments ~a~ and ~b~ are flipped, I prefer to use the curry semantics, rather than add new functions, so we must consider that the typing context is unsual where the type identifer is the first and the added argument is the second.
+exl extracts the first element of the tuple and we use the second argument of abstraction to apply the function therefore we gat a function ~a -> b~.
+#+begin_src haskell
+⟦abstraction e1⟧ = curry ⟦e1⟧
+#+end_src
+***** Applications
+****** △ operator
+
+The ~△~ operator takes in two terms and constructs a function that is a tuple of those functions, we can specify it as:
+#+begin_src haskell
+f ~△ g = \x -> (f x, g x)
+#+end_src
+It's notion is in cartesian part of CCC and it's the introduction form, cartesian adds products to the category.
+
+****** apply
+~apply~ is a function that takes in a tuple and apply's the first term to the
+second.
+~apply~ is in the closed part of CCC.
+****** Back to application
+We have what we need to make denotation.
+#+begin_src haskell
+⟦application a b⟧ = apply . ⟦a⟧ △ ⟦b⟧
+#+end_src
+***** Pair
+The ~△~ corresponds perfectly as the introduction form to the pair.
+#+begin_src haskell
+⟦pair e1 e2⟧ = ⟦e1⟧ △ ⟦e2⟧
+#+end_src
+All the functions concerning products is the cartesian part of the CCC, which has introduction and projections.
+***** Fst
+Fst is exl.
+
+#+begin_src haskell
+⟦fst e1⟧ = exl ⟦e1⟧  
+#+end_src
+***** Snd
+
+Snd is exr
+#+begin_src haskell
+⟦snd e1⟧ = exr ⟦e1⟧  
+#+end_src
+***** Unit
+The ~unit~ function corresponds to the ~it~ function earlier.
+#+begin_src haskell
+⟦unit e1⟧ = it ⟦e1⟧
+#+end_src
+*** Parsing
+**** Parsing types
+***** Parser type
+While the parser type is slighty complicated being ~Parsec (wrap h a)~, we can think of it as ~String -> (wrap h a)~, ~String~ is ~[Char]~, we can also say the denotation of ~Char~ is a disjoint union, (a sum type) and /a/ denotation of a list is a sequence and since we have the denotation of ~wrap h a~ we can therefore write the semantic function as:
+While the notation of sequence is ~()~, since parantheses are used a lot in Haskell we will instead use: ~⟨⟩~.
+#+begin_src haskell
+⟦_⟧ :: Lambda (wrap h a) => Parsec (wrap h a) -> (⟨Char⟩ -> (h -> a))
+#+end_src
+Other than this type, there will be no more denotations since that goes into the implementation details of the library (MegaParsec) which currently has no denotional semantics described for us to use.
+
+*** The full picture
+This shows the complete denotation, I think it shows the beauty and elegance of denotational design, combined with literate programming.
+#+begin_src haskell
+⟦_⟧ :: Lambda (wrap a b) => wrap a b -> (a -> b)
+⟦variables0⟧ = exr
+⟦abstraction e1⟧ = curry ⟦e1⟧
+⟦variablesSucc e1⟧ = ⟦e1⟧ . exl   
+⟦application a b⟧ = apply . ⟦a⟧ △ ⟦b⟧
+⟦pair e1 e2⟧ = ⟦e1⟧ △ ⟦e2⟧
+⟦fst e1⟧ = exl ⟦e1⟧
+⟦snd e1⟧ = exr ⟦e1⟧
+
+-- Parsing
+⟦_⟧ :: Lambda (wrap h a) => Parsec (wrap h a) -> (⟨Char⟩ -> (h -> a))
+#+end_src
+* Implementation
+** Infrastructure
+*** Add libraries
+Run bash to install MegaParsec
+#+begin_src bash
+cabal install --lib megaparsec
+#+end_src
+*** Language extensions
+Language extensions here.
+#+begin_src haskell :results silent
+:set -XPartialTypeSignatures
+:set -XScopedTypeVariables
+:set -XOverloadedStrings
+#+end_src
+
+*** Imports
+In this heading we have imports.
+#+begin_src haskell
+import Text.Megaparsec
+#+end_src
+
+#+RESULTS:
+
+*** Muli-line
+This options allows literate programming with Haskell to be much better where it allows to make multi-line functions, (org-babel connects to ghci).
+#+NAME: multi-line
+#+begin_src haskell :results silent
+:set +m
+#+end_src
+*** Compilation target
+~C-c~ this code block to compile the full program.
+**** TODO Compile it
+
+** Essential State
+*** Types
+# While, the function category is the semantic domain, we need a way to capture get those parameters, R is representially identical to the function type and it gives us the unR function which lets use that data at will.
+The main type that we are going to use is the function type ~(->)~, it comes built in with Haskell.
+*** Relations
+In the out of the tar pit paper, the authors suggest only using relations and more generally the relational algebra for the state part of a program, we adhere to the paper by using record types analogously as relations.
+As I said before, record types in Haskell can be analogous to relations (tables in SQL), infact, this approach is used in Persistent which is the most popular ORM in Haskell and the native Haskell database Project-M36 (check this project out, it's really underrated).
+The main relation is the ~R~ relation which has one pair, ~unR~ is the attribute's name and it's type is the function type.
+Let's define it:
+#+NAME: reader
+#+begin_src haskell :results silent
+data R h a = R {unR :: h -> a}
+#+end_src
+The ~R~ relation is actually isomorphic to the function type since they are representially the same.
+** Essential Logic
+*** AST
+**** Classes
+Expr is the AST of the Ari language, as I have have said before, Ari uses tagless-final so functions instead of an ADT to descibe an AST. 
+
+#+begin_src haskell :results silent
+class AST wrap where
+  variable0 :: wrap (h, a) a
+  variableSucc :: wrap h a -> wrap (h, any) a
+  abstraction :: wrap (h, a) b -> wrap h (a -> b)
+  application :: wrap h (a -> b) -> wrap h a -> wrap h b
+  pair :: wrap h a -> wrap h b -> wrap h (a, b)
+  fst' :: wrap h (a, b) -> wrap h a
+  snd' :: wrap h (a, b) -> wrap h b
+  unit :: wrap h ()
+
+-- Necessary comment for the where clause to be closed, ob-haskell should be improved :)
+#+end_src
+**** Instance
+***** Helper functions
+Helper functions that will make the code cleaner.
+#+begin_src haskell :results silent
+apply (f, x) = f x
+triangle f g = \x -> (f x, g x)
+fe1 e1 = \x -> (unR e1 x)
+fe2 e2 = \x -> (unR e2 x)
+it' h = ()
+  
+#+end_src
+
+***** Back to reader instance
+Since we are doing the AST, the tagless-final way, the design and implementation are actually not that different which I find to be so beautiful.
+#+begin_src haskell
+instance AST R where
+  variable0 = R $ snd
+  variableSucc v = R $ unR v . fst
+  abstraction e1 = R $ curry (unR e1)
+  application e1 e2 = R $ apply . (triangle (fe1 e1) (fe2 e2))
+  pair e1 e2 = R $ triangle (fe1 e1) (fe2 e2)
+  fst' e1 = R $ \h -> fst $ (unR e1 h)
+  snd' e1 = R $ \h -> snd $ (unR e1 h)
+  unit = R $ it'
+-- T
+#+end_src
+
+#+RESULTS:
+
+
+*** Evaluator
+Evaluation is simple with just the function:
+#+begin_src haskell
+eval e = unR e ()
+#+end_src
+
+#+RESULTS:
+
+*** Parser
+**** Reversed words
+Words that are not avalaible for the user.
+#+begin_src haskell
+reservedWords :: [String]
+reservedWords = ["zero", "succ", "lam", "pair", "fst", "snd", "unit"]
+#+end_src
+
+**** Back to parser
+Simple parser combinations, we are not using the R type but instead we are overloading the operations
+#+begin_src haskell
+import Text.Megaparsec.Char
+import Data.Void 
+
+type Parser = Parsec Void String
+:{
+parseVariable0 :: Parser (R (h, a) a)
+parseVariable0 = string ("zero") *> pure variable0
+parseVariableSucc :: Parser ((R h a) -> (R (h, any) a))
+parseVariableSucc = string "succ" *> pure variableSucc
+-- parseApplication :: Parser (R env (a -> b) -> R env a -> R env b)
+-- parseApplication = string ""
+parseAbstraction :: Parser (R (env, a) b -> R env (a -> b))
+parseAbstraction = string "lam" *> pure abstraction   
+parsePair :: Parser (R h a)
+parsePair :: Parser (R env a -> R env b -> R env (a, b))
+parsePair = 
+
+parseFst :: Parser (wrap h a)
+-- parseSnd :: Parser (wrap h a)
+-- parseUnit  :: Parser (wrap h a)
+:}
+#+end_src
+
+
+** Accidental State And Control
+** Other (Interfacing)
+* Footnotes
+[fn:1]:
