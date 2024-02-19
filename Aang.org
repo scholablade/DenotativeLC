@@ -93,8 +93,8 @@ Doing a tagless-final embedding is literally writing a denotational semantics fo
 That quote got me excited and after understanding the technique, I can say it does a really good job at it.
 There is one huge pitfall though for creating DSLs and that's that, A tagless-final embedding is a /shallow/ embedding, meaning we have no AST at our disposal, for applications like parsing or optimization.
 *** The path for a solution
-I have looked into many papers to solve this problem like ~Deep embedding with class~ and ~Combining Shallow and Deep EDSLs~, the former uses an AST data type for a representation and includes a backdoor via existenial type for extension, the issue comes from the fact that it loses the denotational semantic properties that makes tagless-final so attractive, while the latter starts with a deep embedding with a shallow wrapper on top, which automatically makes the technique non-applicable for my needs.
-
+I have looked into many papers to solve this problem like ~Deep embedding with class~ and ~Combining Shallow and Deep EDSLs~, the former uses an AST data type for a representation and includes a backdoor via existenial type for extension, the issue comes from the fact that it loses the denotational semantic properties that makes tagless-final so attractive, while the latter starts with a deep embedding with a shallow wrapper on top, which automatically makes the technique non-applicable for my needs, though there was one paper that was incredibly enlightening.
+*** Deeper shallow embedding
 * Design
 ** Functionality
 Aang is a simply typed lambda calculus (STLC) (for now), typically STLC has 2 base types and 4 expressions.
