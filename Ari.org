@@ -74,6 +74,7 @@
 * Licenses
 ** TODO Add license for the code and prose
 * Motivation / Goals
+** Arithemtic types
 ** Writing in Denotative Relational Literate Programming
 *** Denotational Design
 Denotational design is a methodology developed by Conal Elliott, to improve the state of software development, currently most software is developed without any design and a dose of (let's just do it), this leaves a bunch of problems like technical debt, leaky abstraction and much more, denotational design at it's essence is to make a mathematical model of your types and operations by /simple/ math that has been discovered for other reasons, for example we can /denotate/ a stack data structure to be a function that takes in a natural number and returns an ~a~, so ~Nat -> a~, then we will make denotate the functions that use Stack like ~empty~ for an empty stack.
@@ -184,7 +185,7 @@ The full API:
 wrap env a
 variable0 :: wrap (h, a) a
 variableSucc :: wrap h a -> wrap (h, any) a
-application :: wrap env (a -> b) -> wrap env a -> wrap env b
+application :: wrap h (a -> b) -> wrap h a -> wrap h b
 abstraction :: wrap (env, a) b -> wrap env (a -> b)
 pair :: wrap env a -> wrap env b -> wrap env (a, b)
 fst :: wrap env (a, b) -> wrap env a
@@ -413,6 +414,7 @@ instance AST R where
 
 #+RESULTS:
 
+
 *** Evaluator
 Evaluation is simple with just the function:
 #+begin_src haskell
@@ -420,7 +422,6 @@ eval e = unR e ()
 #+end_src
 
 #+RESULTS:
-
 
 *** Parser
 **** Reversed words
@@ -430,32 +431,31 @@ reservedWords :: [String]
 reservedWords = ["zero", "succ", "lam", "pair", "fst", "snd", "unit"]
 #+end_src
 
-#+RESULTS:
-: <interactive>:53:1-13: error:
-:     Variable not in scope: reservedWords :: [String]
-
 **** Back to parser
 Simple parser combinations, we are not using the R type but instead we are overloading the operations
 #+begin_src haskell
 import Text.Megaparsec.Char
-import Text.Megaparsec
 import Data.Void 
+
 type Parser = Parsec Void String
-instance Show Parser
-  
+:{
 parseVariable0 :: Parser (R (h, a) a)
 parseVariable0 = string ("zero") *> pure variable0
+parseVariableSucc :: Parser ((R h a) -> (R (h, any) a))
+parseVariableSucc = string "succ" *> pure variableSucc
+-- parseApplication :: Parser (R env (a -> b) -> R env a -> R env b)
+-- parseApplication = string ""
+parseAbstraction :: Parser (R (env, a) b -> R env (a -> b))
+parseAbstraction = string "lam" *> pure abstraction   
+parsePair :: Parser (R h a)
+parsePair :: Parser (R env a -> R env b -> R env (a, b))
+parsePair = 
 
-
+parseFst :: Parser (wrap h a)
+-- parseSnd :: Parser (wrap h a)
+-- parseUnit  :: Parser (wrap h a)
+:}
 #+end_src
-
-#+RESULTS:
-: <interactive>:153:1-37: error:
-:     • No instance for (Show (Parser (R (h0, a0) a0)))
-:         arising from a use of ‘print’
-:     • In a stmt of an interactive GHCi command: print it
-
-
 
 
 ** Accidental State And Control
