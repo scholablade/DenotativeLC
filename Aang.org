@@ -1,4 +1,4 @@
-#+title: Design and Implementation of the Ari Programming Language
+#+title: Design and Implementation of the Aang Programming Language
 
 * Table of contents
 :PROPERTIES:
@@ -83,10 +83,21 @@ Denotational design is a methodology developed by Conal Elliott, to improve the 
 *** Literate Programming
 *** Functional Relational Programming
 *** Combining all three
-** A Malleable Programming Language
+** Denotative embedding
+I went on a quest to find a way to to make a programming language using denotational semantics, I discovered tagless-final with some help from the user @Oni in the helpful FP discord server.
+*** Tagless-final
+Tagless-final is a technique of embedding domain specific languages (DSLs) in to the host langauge (Haskell in my case), instead of using data constructors as a representation of DSL terms, you typically use functions inside of a typeclass (or ML modules), this allows excellent extensibility, it is a fine solution to the expression problem, the main attraction for me is that from the author's words:
+#+begin_quote
+Doing a tagless-final embedding is literally writing a denotational semantics for the DSL -- in a host programming language rather than on paper.
+#+end_quote
+That quote got me excited and after understanding the technique, I can say it does a really good job at it.
+There is one huge pitfall though for creating DSLs and that's that, A tagless-final embedding is a /shallow/ embedding, meaning we have no AST at our disposal, for applications like parsing or optimization.
+*** The path for a solution
+I have looked into many papers to solve this problem like ~Deep embedding with class~ and ~Combining Shallow and Deep EDSLs~, the former uses an AST data type for a representation and includes a backdoor via existenial type for extension, the issue comes from the fact that it loses the denotational semantic properties that makes tagless-final so attractive, while the latter starts with a deep embedding with a shallow wrapper on top, which automatically makes the technique non-applicable for my needs.
+
 * Design
 ** Functionality
-Ari is a simply typed lambda calculus (STLC) (for now), typically STLC has 2 base types and 4 expressions.
+Aang is a simply typed lambda calculus (STLC) (for now), typically STLC has 2 base types and 4 expressions.
 We follow the paper[fn:1], which defines the following types and expressions.
 *** For types:
 - Base Type
@@ -177,7 +188,7 @@ parseUnit  :: Lambda wrap h a => Parsec wrap h a
 #+end_src
 We can combine these combinators into one parser:
 #+begin_src haskell
-parseAri :: Lambda wrap h a => Parsec wrap h a
+parseAang :: Lambda wrap h a => Parsec wrap h a
 #+end_src
 *** The full picture
 The full API:
@@ -202,7 +213,7 @@ parsePair :: Lambda wrap h a => Parsec wrap h a
 parseFst :: Lambda wrap h a => Parsec wrap h a
 parseSnd :: Lambda wrap h a => Parsec wrap h a
 parseUnit :: Lambda wrap h a => Parsec wrap h a
-parseAri :: Lambda wrap h a => Parsec wrap h a  
+parseAang :: Lambda wrap h a => Parsec wrap h a  
 #+end_src
 
 
@@ -370,7 +381,7 @@ The ~R~ relation is actually isomorphic to the function type since they are repr
 ** Essential Logic
 *** AST
 **** Classes
-Expr is the AST of the Ari language, as I have have said before, Ari uses tagless-final so functions instead of an ADT to descibe an AST. 
+Expr is the AST of the Aang language, as I have have said before, Aang uses tagless-final so functions instead of an ADT to descibe an AST. 
 
 #+begin_src haskell :results silent
 class AST wrap where
