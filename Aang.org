@@ -334,68 +334,154 @@ This shows the complete denotation, I think it shows the beauty and elegance of 
 * Implementation
 ** Infrastructure
 *** Add libraries
-Run bash to install MegaParsec
+Run bash to install MegaParsec and first class families.
 #+begin_src bash
 cabal install --lib megaparsec
+cabal install --lib first-class-families
 #+end_src
 *** Language extensions
-Language extensions here.
+Am using advanced GHC extensions to mostly compute at the type level per the requirements of Denotative embedding.
 #+begin_src haskell :results silent
 :set -XPartialTypeSignatures
 :set -XScopedTypeVariables
 :set -XOverloadedStrings
+:set -XQuasiQuotes
+:set -XTemplateHaskell
+:set -XTypeInType
+:set -XTypeFamilies
+:set -XPartialTypeSignatures
+:set -XUndecidableInstances
+:set -XPolyKinds
+:set -XStandaloneDeriving
+:set -XGADTs
+:set -XAllowAmbiguousTypes
+:set -XDataKinds
 #+end_src
 
 *** Imports
-In this heading we have imports.
+**** Load imports
+GHCi requires us to load imports before using them.
+#+begin_src haskell :results silent
+:set -package singletons-th
+#+end_src
+
+
+
+Importing a parser library and type level programming libraries.
 #+begin_src haskell
 import Text.Megaparsec
+import Text.Megaparsec.Char
+import Fcf
+import Data.Singletons.TH
+
+
 #+end_src
 
 #+RESULTS:
 
-*** Muli-line
+*** Multi-line
 This options allows literate programming with Haskell to be much better where it allows to make multi-line functions, (org-babel connects to ghci).
 #+NAME: multi-line
 #+begin_src haskell :results silent
 :set +m
 #+end_src
 *** Compilation target
+Using Emacs and org-mode major mode, use this code block to compile Aang, it references the web of codeblocks for ease of use.
 ~C-c~ this code block to compile the full program.
 **** TODO Compile it
 
 ** Essential State
 *** Types
-# While, the function category is the semantic domain, we need a way to capture get those parameters, R is representially identical to the function type and it gives us the unR function which lets use that data at will.
 The main type that we are going to use is the function type ~(->)~, it comes built in with Haskell.
 *** Relations
 In the out of the tar pit paper, the authors suggest only using relations and more generally the relational algebra for the state part of a program, we adhere to the paper by using record types analogously as relations.
 As I said before, record types in Haskell can be analogous to relations (tables in SQL), infact, this approach is used in Persistent which is the most popular ORM in Haskell and the native Haskell database Project-M36 (check this project out, it's really underrated).
 The main relation is the ~R~ relation which has one pair, ~unR~ is the attribute's name and it's type is the function type.
 Let's define it:
+
 #+NAME: reader
 #+begin_src haskell :results silent
-data R h a = R {unR :: h -> a}
+:{
+data Reader h a = MkReader {unReader :: h -> Exp a}
+type UnReader :: Reader h a -> (h -> Exp a)  
+type family UnReader f where
+  UnReader (MkReader a) = a  
+:}
 #+end_src
 The ~R~ relation is actually isomorphic to the function type since they are representially the same.
+
 ** Essential Logic
 *** AST
 **** Classes
 Expr is the AST of the Aang language, as I have have said before, Aang uses tagless-final so functions instead of an ADT to descibe an AST. 
 
-#+begin_src haskell :results silent
-class AST wrap where
-  variable0 :: wrap (h, a) a
-  variableSucc :: wrap h a -> wrap (h, any) a
-  abstraction :: wrap (h, a) b -> wrap h (a -> b)
-  application :: wrap h (a -> b) -> wrap h a -> wrap h b
-  pair :: wrap h a -> wrap h b -> wrap h (a, b)
-  fst' :: wrap h (a, b) -> wrap h a
-  snd' :: wrap h (a, b) -> wrap h b
-  unit :: wrap h ()
+#+begin_src haskell 
+import Fcf.Data.Common
+
+newtype ReaderFree h a = MkReaderFree {unReaderFree :: h -> a}
+  
+class Aang wrap where
+  type Variable0 :: wrap (h, a) a
+  type VariableSucc (v :: wrap h a) :: wrap (h, any) a
+  type Abstraction (e1 :: wrap (h,a) b) :: wrap h  (a -> b)
+  
+instance Aang Reader where
+
+   type Variable0 = 'MkReader Snd
+   type VariableSucc v = 'MkReader (UnReader v <=< Fst)
+   type Abstraction e1 = 'MkReaderFree (Curry (UnReader e1))
+
+   
+-- class AST where
+--   variable0 :: wrap (h, a) a
+--   variableSucc :: wrap h a -> wrap (h, any) a
+--   abstraction :: wrap (h, a) b -> wrap h (a -> b)
+--   application :: wrap h (a -> b) -> wrap h a -> wrap h b
+
+--   pair :: wrap h a -> wrap h b -> wrap h (a, b)
+--   fst' :: wrap h (a, b) -> wrap h a
+--   snd' :: wrap h (a, b) -> wrap h b
+--   unit :: wrap h ()
 
 -- Necessary comment for the where clause to be closed, ob-haskell should be improved :)
 #+end_src
+
+#+RESULTS:
+: <interactive>:603:4-60: error:
+:     • The type family ‘Curry’ should have 3 arguments, but has been given 1
+:     • In the type synonym declaration for ‘Abstraction’
+
+
+#+begin_src haskell
+
+-- type family  A v where
+--   A v =  MkReader (UnReader v <=< Fst)
+-- data Curry :: ((a, b) -> c) -> a -> b -> c
+
+-- type instance Eval (Curry f x y) = Eval (f '(x, y))
+type family A a where
+  A a = Curry (UnReader a)
+-- (.) :: (b -> c) -> (a -> b) -> a -> c
+-- data Compose :: (a -> Exp b) -> (b -> Exp c) -> a -> Exp c
+-- type instance Eval (Compose f g x) = f (g x)
+#+End_src
+
+#+RESULTS:
+: ghci| ghci| 
+: <interactive>:627:3-26: error:
+:     • The type family ‘Curry’ should have 3 arguments, but has been given 1
+:     • In the equations for closed type family ‘A’
+:       In the type family declaration for ‘A’
+
+
+
+
+
+
+
+
+
+
 **** Instance
 ***** Helper functions
 Helper functions that will make the code cleaner.
@@ -411,20 +497,18 @@ it' h = ()
 ***** Back to reader instance
 Since we are doing the AST, the tagless-final way, the design and implementation are actually not that different which I find to be so beautiful.
 #+begin_src haskell
-instance AST R where
-  variable0 = R $ snd
-  variableSucc v = R $ unR v . fst
-  abstraction e1 = R $ curry (unR e1)
-  application e1 e2 = R $ apply . (triangle (fe1 e1) (fe2 e2))
-  pair e1 e2 = R $ triangle (fe1 e1) (fe2 e2)
-  fst' e1 = R $ \h -> fst $ (unR e1 h)
-  snd' e1 = R $ \h -> snd $ (unR e1 h)
-  unit = R $ it'
+
+instance AST Reader where
+  variable0 = MkReader $ snd
+  variableSucc v = MkReader $ unMkReader v . fst
+  abstraction e1 = MkReader $ curry (unMkReader e1)
+  application e1 e2 = MkReader $ apply . (triangle (fe1 e1) (fe2 e2))
+  pair e1 e2 = MkReader $ triangle (fe1 e1) (fe2 e2)
+  fst' e1 = MkReader $ \h -> fst $ (unMkReader e1 h)
+  snd' e1 = MkReader $ \h -> snd $ (unMkReader e1 h)
+  unit = MkReader $ it'
 -- T
 #+end_src
-
-#+RESULTS:
-
 
 *** Evaluator
 Evaluation is simple with just the function:

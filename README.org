@@ -1,0 +1,9 @@
+#+Title: The Aang Programming Language
+Aang is a purely functional programming language with Arithemtic types meaning negative and fractional types, the dual of sum and product types, Aang is a Haskell literate program using what I call, "Denotative Relational Literate Programming", Aang is embedded via denotative embedding, a combination of tagless-final, deeper shallow embedding and denotational semantics.
+Aang is in heavy development.
+* Code example
+* Download
+* Source
+The source is simply ~Aang.org~, it is a single text file comprising of prose and source code, for 
+development on Aang, I recommend you setup Emacs with org-mode.
+* Donate
