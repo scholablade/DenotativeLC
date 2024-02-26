@@ -1,73 +1,5 @@
 #+title: Design and Implementation of the Aang Programming Language
-
-* Table of contents
-:PROPERTIES:
-:TOC:      :include all :depth 6 :ignore (this)
-:CONTENTS:
-- [[#getting-started][Getting Started]]
-  - [[#add-code-example][Add Code example]]
-- [[#licenses][Licenses]]
-  - [[#add-license-for-the-code-and-prose][Add license for the code and prose]]
-- [[#motivation--goals][Motivation / Goals]]
-  - [[#writing-in-denotative-relational-literate-programming][Writing in Denotative Relational Literate Programming]]
-  - [[#a-malleable-programming-language][A Malleable Programming Language]]
-- [[#design][Design]]
-  - [[#functionality][Functionality]]
-    - [[#for-types][For types:]]
-    - [[#for-expressions][For Expressions:]]
-  - [[#specification][Specification]]
-    - [[#types][Types]]
-    - [[#expressions][Expressions]]
-      - [[#variables][Variables]]
-      - [[#abstractions][Abstractions]]
-      - [[#application][Application]]
-      - [[#constructors][Constructors]]
-      - [[#pair][Pair]]
-      - [[#fst][Fst]]
-      - [[#snd][Snd]]
-      - [[#unit][Unit]]
-    - [[#the-full-picture][The full picture]]
-  - [[#denotation][Denotation]]
-    - [[#types][Types]]
-      - [[#the-semantic-domain-the-function-category][The Semantic Domain: The Function Category]]
-    - [[#expressions][Expressions]]
-      - [[#variables][Variables]]
-        - [[#exr][exr]]
-        - [[#exl][exl]]
-        - [[#typing-context][Typing context]]
-        - [[#][(.)]]
-        - [[#back-to-variables][Back to variables]]
-      - [[#abstractions][Abstractions]]
-        - [[#curry][Curry]]
-        - [[#back-to-the-abstraction-function][Back to the abstraction function]]
-      - [[#applications][Applications]]
-        - [[#-operator][△ operator]]
-        - [[#apply][apply]]
-        - [[#back-to-application][Back to application]]
-      - [[#pair][Pair]]
-      - [[#fst][Fst]]
-      - [[#snd][Snd]]
-      - [[#unit][Unit]]
-    - [[#the-full-picture][The full picture]]
-- [[#implementation][Implementation]]
-  - [[#infrastructure][Infrastructure]]
-    - [[#muli-line][Muli-line]]
-    - [[#compilation-target][Compilation target]]
-      - [[#compile-it][Compile it]]
-  - [[#essential-state][Essential State]]
-    - [[#types][Types]]
-    - [[#relations][Relations]]
-  - [[#essential-logic][Essential Logic]]
-    - [[#ast][AST]]
-      - [[#classes][Classes]]
-      - [[#instance][Instance]]
-        - [[#helper-functions][Helper functions]]
-        - [[#back-to-reader-instance][Back to reader instance]]
-  - [[#accidental-state-and-control][Accidental State And Control]]
-  - [[#other-interfacing][Other (Interfacing)]]
-- [[#footnotes][Footnotes]]
-:END:
-
+#+LATEX_HEADER: \usepackage{semantic}
 * Getting Started
 ** TODO Add Code example
 
@@ -106,11 +38,22 @@ I have looked into many papers to solve this problem like ~Deep embedding with c
 ** Functionality
 Aang is a simply typed lambda calculus with constructors and arithemtic types, arithemtic types meaning sum, product, negative and fractional types,
 The following defines the following the types and expressions.
+Here are the inference rules:
 *** For types:
 - Base Type
 - Function Type
 *** For Expressions:
-- Variables
+**** Variables
+Variables are de bruijn indice.
+#+name: t
+#+header: :fit yes :noweb yes :headers '("\\usepackage{semantic}")
+
+#+begin_src latex
+\[
+\inference {A \quad B}{C}[d]
+\]
+#+end_src
+
 - Abstractions
 - Applications
 - Constructors
@@ -122,7 +65,6 @@ The following defines the following the types and expressions.
 ** Specification
 *** AST
 **** Types
-Since we use a subset of Haskell's type system we don't have to do much if at all, this approach is called higher-order abstract syntax (HOAS).
 **** Expressions
 ***** Variables
 Similar as in the types heading we can also use Haskell's variable semantics therefore we don't have to specify variables in our language.
@@ -223,7 +165,6 @@ parseSnd :: Lambda wrap h a => Parsec wrap h a
 parseUnit :: Lambda wrap h a => Parsec wrap h a
 parseAang :: Lambda wrap h a => Parsec wrap h a  
 #+end_src
-
 
 ** Denotation
 We are going to make semantic functions that map the lambda calculus world to /a/ closed cartesian category, first we have to define the semantic domain though. 
@@ -342,10 +283,10 @@ This shows the complete denotation, I think it shows the beauty and elegance of 
 * Implementation
 ** Infrastructure
 *** Add libraries
-Run bash to install MegaParsec and first class families.
+Run bash to install MegaParsec and HList.
 #+begin_src bash
 cabal install --lib megaparsec
-cabal install --lib first-class-families
+cabal install --lib HList
 #+end_src
 *** Language extensions
 Am using advanced GHC extensions to mostly compute at the type level per the requirements of Denotative embedding.
@@ -371,7 +312,7 @@ GHCi requires us to load imports before using them.
 #+begin_src haskell :results silent
 :set -package base
 :set -package megaparsec
-
+:set -package HList
 #+end_src
 
 
@@ -381,6 +322,7 @@ Importing a parser library and type level programming libraries.
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Data.Void
+import Data.HList.HList  
 #+end_src
 
 *** Multi-line
@@ -396,7 +338,11 @@ Using Emacs and org-mode major mode, use this code block to compile Aang, it ref
 
 ** Essential State
 *** Types
+**** Function type
 The main type that we are going to use is the function type ~(->)~, it comes built in with Haskell.
+**** HList
+We can use tuples to represent the environment but that is a messy solution instead we will use an ~HList~ instead.
+We will use the ~HList~ provided from the ~HList~ library.
 *** Relations
 In the out of the tar pit paper, the authors suggest only using relations and more generally the relational algebra for the state part of a program, we adhere to the paper by using record types analogously as relations.
 As I said before, record types in Haskell can be analogous to relations (tables in SQL), infact, this approach is used in Persistent which is the most popular ORM in Haskell and the native Haskell database Project-M36 (check this project out, it's really underrated).
@@ -405,7 +351,7 @@ Let's define it:
 
 #+NAME: reader
 #+begin_src haskell :results silent
-data Reader h a = MkReader {unReader :: h -> a}
+data Reader h a = MkReader {unReader :: HList h -> a}
 #+end_src
 The ~R~ relation is actually isomorphic to the function type since they are representially the same.
 
@@ -423,20 +369,24 @@ class CoCartesian wrap where
 #+end_src
 
 #+begin_src haskell 
-  
+data LUnit = LUnit  
 class AST wrap where
-  variable0 :: wrap (h, a) a
-  variableSucc :: wrap h a -> wrap (h, a) a
-  abstraction :: wrap (h, a) b -> wrap h (a -> b)
-  application :: wrap h (a -> b) -> wrap h a -> wrap h b
-  pair :: wrap h a -> wrap h b -> wrap h (a, b)
-  fst' :: wrap h (a, b) -> wrap h a
-  snd' :: wrap h (a, b) -> wrap h b
-  unit :: wrap h ()
-  intoLeft :: wrap h a -> wrap h (Either a b)
-  intoRight :: wrap h b -> wrap h (Either a b)
-  prjLeft :: wrap h (Either a b) -> wrap h a
-  prjRight :: wrap h (Either a b) -> wrap h b
+  variable0 :: wrap (a ': xs) a
+  variableSucc :: wrap as a -> wrap (b ': as) a
+  abstraction :: wrap (a ': xs) b -> wrap xs (a -> b)
+  application :: wrap env (a -> b) -> wrap env a -> wrap env b
+  unit :: wrap env LUnit
+  pair :: wrap env a -> wrap env b -> wrap env (a, b)
+  fst' :: wrap env (a, b) -> wrap env a
+  inl :: repr env a -> repr env (Either a b)
+  inr :: repr env b -> repr env (Either a b)
+  snd' :: wrap env (a, b) -> wrap env b 
+  void :: repr env Void 
+  -- unit :: wrap h ()
+  -- intoLeft :: wrap h a -> wrap h (Either a b)
+  -- intoRight :: wrap h b -> wrap h (Either a b)
+  -- prjLeft :: wrap h (Either a b) -> wrap h a
+  -- prjRight :: wrap h (Either a b) -> wrap h b
 
 -- Necessary comment for the where clause to be closed, ob-haskell should be improved :)
 #+end_src
@@ -469,26 +419,28 @@ it' h = ()
 ***** Back to reader instance
 Since we are doing the AST, the tagless-final way, the design and implementation are actually not that different which I find to be so beautiful.
 #+begin_src haskell
-
+:{
 instance AST Reader where
-  variable0 = MkReader $ snd
-  variableSucc v = MkReader $ unReader v . fst
-  abstraction e1 = MkReader $ curry (unReader e1)
-  application e1 e2 = MkReader $ apply . (triangle (fe1 e1) (fe2 e2))
-  pair e1 e2 = MkReader $ triangle (fe1 e1) (fe2 e2)
-  fst' e1 = MkReader $ \h -> fst $ (unReader e1 h)
-  snd' e1 = MkReader $ \h -> snd $ (unReader e1 h)
-  unit = MkReader $ it'
+  variable0 = MkReader $ \(HCons x _) -> x
+  variableSucc (MkReader f) = MkReader $ \(HCons _ env) -> f env
+  abstraction e1 = MkReader $ (\f x -> unReader e1 (HCons x f))
+  application e1 e2 = MkReader $ (\f -> (unReader e1 f) (unReader e2 f))
+  unit = MkReader $ \env -> LUnit
+  pair e1 e2 = MkReader $ (\env -> (unReader e1 env, unReader e2 env))
+  fst' e1 = MkReader $ (\env -> fst $ (unReader e1 env))
+  snd' e1 = MkReader $ \env -> snd $ (unReader e1 env)
+  inl f = MkReader $ (\env -> Left (unReader f env))
+  inr f = MkReader $ (\env -> Right (unReader f env))
+  void = undefined
+:}      
+  -- pair e1 e2 = MkReader $ triangle (fe1 e1) (fe2 e2)
+ 
+  -- unit = MkReader $ it'
 
 -- T
 #+end_src
 
 #+RESULTS:
-: ghci| ghci| ghci| ghci| ghci| ghci| ghci| ghci| ghci| 
-: <interactive>:532:10-19: warning: [GHC-06201] [-Wmissing-methods]
-:     • No explicit implementation for
-:         ‘intoLeft’, ‘intoRight’, ‘prjLeft’, and ‘prjRight’
-:     • In the instance declaration for ‘AST Reader’
 
 
 *** Parser
