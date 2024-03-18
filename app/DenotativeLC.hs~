@@ -1,0 +1,217 @@
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+
+module DenotativeLC where
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import Data.Void    
+
+class Category wrap where
+  id' :: wrap a a
+  (<<) :: (wrap b c) -> (wrap a b) -> (wrap a c)
+class Cartesian wrap where
+  triangle :: (wrap a c) -> (wrap a d) -> (wrap a (c, d))
+  exl :: wrap (a, b) a
+  exr :: wrap (a, b) b
+class CoCartesian wrap where
+  inl :: wrap h a -> wrap h (Either a b)
+  inr :: wrap h b -> wrap h (Either a b)
+
+class Closed wrap where
+  apply :: wrap ((a -> b), a) b
+  curry' :: (wrap (a, b)  c) -> (wrap a (b -> c))
+  uncurry' :: (wrap a (b -> c)) -> (wrap (a, b) c)
+
+class Terminal wrap where
+  it' :: a `wrap` ()
+
+class (Category wrap, Cartesian wrap, CoCartesian wrap, Closed wrap, Terminal wrap) => AST wrap where
+  variable0 :: wrap (h, a) a
+  variableSucc :: wrap h a -> wrap (h, any) a
+  abstraction :: wrap (h, a) b -> wrap h (a -> b)
+  application :: wrap h (a -> b) -> wrap h a -> wrap h b
+  pair :: wrap h a -> wrap h b -> wrap h (a, b)
+  fst' :: wrap h (a, b) -> wrap h a
+  snd' :: wrap h (a, b) -> wrap h b
+  unit :: wrap h ()
+  inl' :: wrap h a -> wrap h (Either a b)
+  inr' :: wrap h b -> wrap h (Either a b)
+-- Necessary comment for the where clause to be closed, ob-haskell should be improved :)
+
+instance Category (->) where
+  id' =  id
+  (<<) =  (.)
+instance Cartesian (->) where
+  triangle f g = \x -> (f x, g x)
+  exl = fst
+  exr = snd
+instance CoCartesian (->) where
+  inl e = \h -> Left (e h)
+  inr e = \h -> Right (e h)
+instance Closed (->) where
+  apply (f, x) = f x
+  curry' = curry 
+  uncurry' = uncurry
+instance Terminal (->) where
+  it' = \a -> ()
+
+newtype Reader h a = MkReader {unReader :: h -> a} deriving (Category, Cartesian, CoCartesian, Closed, Terminal)
+fe1 e1 = \x -> (unReader e1 x)
+fe2 e2 = \x -> (unReader e2 x)
+
+instance AST Reader where
+  variable0 = MkReader snd
+  variableSucc v = MkReader $ unReader v . fst
+  abstraction e1 = MkReader $ curry (unReader e1)
+  application e1 e2 = MkReader $ apply . (triangle (fe1 e1) (fe2 e2))
+  pair e1 e2 = MkReader $ triangle (fe1 e1) (fe2 e2)
+  fst' e1 = MkReader $ \h -> fst $ (unReader e1 h)
+  snd' e1 = MkReader $ \h -> snd $ (unReader e1 h)
+  unit = MkReader $ it'
+  inl' f = MkReader $ (\env -> Left (unReader f env))  
+  inr' f = MkReader $ (\env -> Right (unReader f env))
+
+--       
+eval e = unReader e ()
+
+data Final h a where
+  Unit3 :: Final h a
+  Unit2 :: Final h ()
+  
+data Initial i h a where
+  Eval :: i h a -> Initial i h a
+  Variable :: Initial i (h, a) a
+  VariableSucc :: Initial i h a -> Initial i (h, any) a
+  Abstraction :: Initial i (h, a) b -> Initial i h (a -> b)
+  Application :: Initial i h (a -> b) -> Initial i h a -> Initial i h b
+  Pair :: Initial i h a -> Initial i h b -> Initial i h (a, b)
+  Fst :: Initial i h (a, b) -> Initial i h a
+  Snd :: Initial i h (a, b) -> Initial i h b
+  Unit :: Initial i h ()
+  Inl :: Initial i h a -> Initial i h (Either a b)
+  Inr :: Initial i h b -> Initial i h (Either a b)
+
+
+--
+
+
+data Exists where
+  Symantic :: forall i h a. Initial i h a -> Exists
+-- deriving instance (Show Exists)  
+
+--
+
+cps :: Exists -> (forall i h a. Initial i h a -> r) -> r
+cps (Symantic t) k = k t
+ 
+data Wrap a = A a | B a | C a | D a | F a
+
+type Parser = Parsec Void String  
+-- parseVar :: Parser Exists
+-- parseVar = string "v" *> pure (Symantic Variable)
+parseVar :: Parser Exists
+parseVar = string "v" *> pure (Symantic Variable)
+
+
+parseVariableSucc = do
+  string "s"
+  i <- parseVar <|> parseVariableSucc
+  let b = cps i (const Variable)
+  pure (Symantic (VariableSucc b))
+  
+parseAbstraction :: Parser Exists
+parseAbstraction = do
+ char '\\'
+ space1
+ v <- parseVar
+ let b = cps v (const Variable)
+ char '.'
+ pure (Symantic (Abstraction b))
+  
+parseApplication :: Parser Exists 
+parseApplication = do
+  a <- parseAbstraction
+  b  <- parseVar
+  let (x, y) = (cps a (const undefined), cps b (const undefined))
+  pure (Symantic (Application x y))
+
+parsePair :: Parser Exists
+parsePair = do
+  char '('
+  space1
+  a <- parseDenotativeLC
+  let b = cps a (const undefined)
+  char ','
+  space1
+  c <- parseDenotativeLC
+  let d = cps c (const undefined)
+  char ')'
+  pure (Symantic (Pair b d))
+  
+  
+parseFst :: Parser Exists
+parseFst = do
+  pair <- parsePair
+  let a = cps pair (const undefined)
+  pure (Symantic (Fst a))
+
+parseSnd :: Parser Exists  
+parseSnd = parseFst  
+  
+parseUnit :: Parser Exists
+parseUnit = string "unit" *> pure (Symantic Unit)
+
+parseInl :: Parser Exists
+parseInl = do
+  string "left"
+  space1
+  a <- parseDenotativeLC
+  let b = cps a (const undefined)
+  pure (Symantic (Inl b))
+  
+parseInr :: Parser Exists
+parseInr = do
+  string "right"
+  space1
+  a <- parseDenotativeLC
+  let b = cps a (const undefined)
+  pure (Symantic (Inl b))
+
+parseDenotativeLC :: Parser Exists
+parseDenotativeLC = parseVar <|> parseVariableSucc <|> parseAbstraction <|> parseApplication <|> parsePair <|> parseFst <|> parseSnd <|> parseInl <|> parseInr
+
+toFinal :: AST wrap => forall h a. Initial wrap h a -> wrap h a
+toFinal (Eval i) = i
+toFinal (Variable) = variable0
+toFinal (VariableSucc a) = variableSucc (toFinal a)
+toFinal (Application a b) = application (toFinal a) (toFinal b)
+toFinal (Abstraction a) = abstraction (toFinal a)
+toFinal (Pair a b) = pair (toFinal a) (toFinal b)
+toFinal (Fst a) = fst' (toFinal a)
+toFinal (Snd b) = snd' (toFinal b)
+toFinal (Unit) = unit
+toFinal (Inl a) = inl' (toFinal a) 
+toFinal (Inr a) = inr' (toFinal a)   
+
+main :: IO ()
+main = do
+   line <- getLine
+   case parse parseDenotativeLC "" line of
+     Right t -> do
+       let val = cps t (const undefined)
+       let evaluated = eval $ toFinal val
+       print evaluated
+       main
+     Left err -> print err
